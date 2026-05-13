@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>School & Task Hub</title>
+    <style>
+        :root {
+            --bg: #0f0f12; --panel: #1c1c21; --text: #e4e4eb; --text-dim: #92929e;
+            --border: #2d2d35; --accent: #3d5afe; --success: #00c853; --warning: #ffab00; --danger: #ff5252;
+            --sidebar-w: 280px;
+        }
+        [data-theme="light"] {
+            --bg: #f0f2f5; --panel: #ffffff; --text: #1c1c21; --text-dim: #5f6368; --border: #dadce0;
+        }
+
+        * { box-sizing: border-box; transition: all 0.2s ease; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+        /* Sidebar */
+        aside { width: var(--sidebar-w); background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px; z-index: 100; }
+        .sidebar-header { font-size: 0.7rem; font-weight: 800; color: var(--accent); text-transform: uppercase; margin: 20px 0 10px; letter-spacing: 1px; }
+        .stat-card { background: var(--bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 10px; }
+        .stat-val { font-size: 1.4rem; font-weight: 800; }
+
+        /* Main Layout */
+        main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        header { padding: 15px 30px; background: var(--bg); border-bottom: 1px solid var(--border); }
+        #view-container { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; gap: 40px; }
+        
+        .section-title { font-size: 1.2rem; font-weight: 800; border-bottom: 2px solid var(--border); padding-bottom: 10px; margin-bottom: 20px; color: var(--accent); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        
+        /* Widgets */
+        .widget { 
+            background: var(--panel); border-radius: 12px; padding: 20px; border: 1px solid var(--border); 
+            border-top: 4px solid var(--accent); position: relative; display: flex; flex-direction: column; gap: 10px;
+        }
+        .widget.fixing { border-top-color: var(--warning); }
+        .widget.complete { border-top-color: var(--success); opacity: 0.6; }
+
+        .work-link { display: block; background: rgba(61, 90, 254, 0.1); color: var(--accent); text-decoration: none; padding: 8px; border-radius: 6px; font-size: 0.8rem; text-align: center; font-weight: bold; border: 1px dashed var(--accent); }
+        .checklist-box { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; font-size: 0.85rem; }
+
+        /* Inputs */
+        .input-group { background: var(--panel); padding: 15px; border-radius: 12px; border: 1px solid var(--border); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        input, select { background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 8px; border-radius: 6px; outline: none; }
+        button { cursor: pointer; border: none; border-radius: 6px; font-weight: 600; padding: 8px 16px; }
+        .btn-primary { background: var(--accent); color: white; }
+
+        #roleOverlay { position: fixed; inset: 0; background: #000; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <div id="roleOverlay">
+        <h1 style="color:white;">Select Your Role</h1>
+        <div style="display:flex; gap:20px;">
+            <button class="btn-primary" style="padding:20px 40px;" onclick="setRole('KID')">👦 KID (Add School Work)</button>
+            <button class="btn-primary" style="padding:20px 40px; background:#444;" onclick="setRole('MOM')">👩 MOM (Add Tasks/Checklists)</button>
+        </div>
+    </div>
+
+    <aside>
+        <div class="sidebar-header">Global Checklists</div>
+        <div id="momChecklistUI" class="hidden">
+            <input type="text" id="globalIn" placeholder="Add school requirement..." style="width:100%; margin-bottom:10px;">
+            <button class="btn-primary" onclick="addGlobalReq()" style="width:100%">Add Requirement</button>
+        </div>
+        <div id="reqList" style="font-size:0.8rem; color:var(--text-dim); margin-top:10px;"></div>
+
+        <div class="sidebar-header">Stats</div>
+        <div class="stat-card"><div id="statSW" class="stat-val">0</div><small>Active School Items</small></div>
+        <div class="stat-card"><div id="statTask" class="stat-val">0</div><small>Active Tasks</small></div>
+    </aside>
+
+    <main>
+        <header>
+            <div id="kidInputArea" class="hidden">
+                <div class="input-group">
+                    <strong>Add School Work:</strong>
+                    <select id="swOpt"><option>AAL</option><option>AFL</option><option>AOL</option></select>
+                    <input type="text" id="swTitle" placeholder="Task description...">
+                    <input type="url" id="swLink" placeholder="Work Link (optional)...">
+                    <input type="date" id="swDate">
+                    <button class="btn-primary" onclick="saveSchoolWork()">Submit Work</button>
+                </div>
+            </div>
+
+            <div id="momInputArea" class="hidden">
+                <div class="input-group">
+                    <strong>Assign General Task:</strong>
+                    <input type="text" id="taskTitle" placeholder="What needs to be done?" style="flex:1">
+                    <input type="date" id="taskDate">
+                    <button class="btn-primary" onclick="saveGeneralTask()">Assign Task</button>
+                </div>
+            </div>
+        </header>
+
+        <div id="view-container">
+            <section>
+                <div class="section-title">📚 School Work Review (/DASH/SW)</div>
+                <div id="sw-grid" class="grid"></div>
+            </section>
+
+            <section>
+                <div class="section-title">✅ General Tasks (/DASH/TASKS)</div>
+                <div id="task-grid" class="grid"></div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const DB = "https://school-saver-default-rtdb.firebaseio.com/DASH";
+        let role = "";
+        let requirements = {};
+
+        function setRole(r) {
+            role = r;
+            document.getElementById('roleOverlay').classList.add('hidden');
+            if(r === 'KID') document.getElementById('kidInputArea').classList.remove('hidden');
+            if(r === 'MOM') {
+                document.getElementById('momInputArea').classList.remove('hidden');
+                document.getElementById('momChecklistUI').classList.remove('hidden');
+            }
+            sync();
+        }
+
+        const ev = new EventSource(DB + ".json");
+        ev.addEventListener('put', sync);
+        ev.addEventListener('patch', sync);
+
+        async function sync() {
+            const res = await fetch(DB + ".json");
+            const data = await res.json() || {};
+            requirements = data.requirements || {};
+            render(data.SW || {}, data.TASKS || {});
+            renderSidebarReqs();
+        }
+
+        function renderSidebarReqs() {
+            const div = document.getElementById('reqList');
+            div.innerHTML = "<strong>Mandatory Steps:</strong><br>";
+            Object.values(requirements).forEach(val => div.innerHTML += `• ${val}<br>`);
+        }
+
+        function render(swData, taskData) {
+            const swGrid = document.getElementById('sw-grid');
+            const taskGrid = document.getElementById('task-grid');
+            swGrid.innerHTML = ""; taskGrid.innerHTML = "";
+            let swCount = 0, taskCount = 0;
+
+            // Render School Work
+            Object.keys(swData).reverse().forEach(id => {
+                const item = swData[id];
+                if(item.status !== 'complete') swCount++;
+                const div = document.createElement('div');
+                div.className = `widget ${item.status || ''}`;
+                
+                let checksHtml = "";
+                Object.keys(requirements).forEach(rid => {
+                    const done = (item.checks && item.checks[rid]) ? 'checked' : '';
+                    checksHtml += `<label style="display:block"><input type="checkbox" ${done} onchange="toggleCheck('${id}','${rid}',this.checked)"> ${requirements[rid]}</label>`;
+                });
+
+                div.innerHTML = `
+                    <div style="display:flex; justify-content:space-between"><small>${item.opt}</small> <small>${item.date || ''}</small></div>
+                    <strong>Check ${item.opt}-${item.title}</strong>
+                    ${item.link ? `<a href="${item.link}" target="_blank" class="work-link">🔗 OPEN WORK</a>` : ''}
+                    <div class="checklist-box">${checksHtml || 'No requirements set.'}</div>
+                    <div style="display:flex; gap:10px; margin-top:auto;">
+                        <button onclick="setStatus('SW','${id}','fixing')" style="background:var(--warning); flex:1">FIX</button>
+                        <button onclick="setStatus('SW','${id}','complete')" style="background:var(--success); flex:1; color:white">APPROVE</button>
+                        ${role==='KID' ? `<button onclick="del('SW','${id}')">🗑️</button>` : ''}
+                    </div>
+                `;
+                swGrid.appendChild(div);
+            });
+
+            // Render General Tasks
+            Object.keys(taskData).reverse().forEach(id => {
+                const item = taskData[id];
+                if(item.status !== 'complete') taskCount++;
+                const div = document.createElement('div');
+                div.className = `widget ${item.status || ''}`;
+                div.innerHTML = `
+                    <div style="display:flex; justify-content:space-between"><small>TASK</small> <small>${item.date || ''}</small></div>
+                    <strong>${item.title}</strong>
+                    <div style="display:flex; gap:10px; margin-top:auto;">
+                        <button onclick="setStatus('TASKS','${id}','complete')" style="background:var(--success); flex:1; color:white">MARK DONE</button>
+                        ${role==='MOM' ? `<button onclick="del('TASKS','${id}')" style="background:var(--danger); color:white">DELETE</button>` : ''}
+                    </div>
+                `;
+                taskGrid.appendChild(div);
+            });
+
+            document.getElementById('statSW').innerText = swCount;
+            document.getElementById('statTask').innerText = taskCount;
+        }
+
+        /* ACTIONS */
+        async function saveSchoolWork() {
+            const opt = document.getElementById('swOpt').value;
+            const title = document.getElementById('swTitle').value;
+            const link = document.getElementById('swLink').value;
+            const date = document.getElementById('swDate').value;
+            if(!title) return;
+            await fetch(DB + "/SW.json", { method:'POST', body: JSON.stringify({opt, title, link, date, status:'default'}) });
+            document.getElementById('swTitle').value = ""; document.getElementById('swLink').value = "";
+        }
+
+        async function saveGeneralTask() {
+            const title = document.getElementById('taskTitle').value;
+            const date = document.getElementById('taskDate').value;
+            if(!title) return;
+            await fetch(DB + "/TASKS.json", { method:'POST', body: JSON.stringify({title, date, status:'default'}) });
+            document.getElementById('taskTitle').value = "";
+        }
+
+        async function addGlobalReq() {
+            const val = document.getElementById('globalIn').value;
+            if(!val) return;
+            await fetch(DB + "/requirements.json", { method:'POST', body: JSON.stringify(val) });
+            document.getElementById('globalIn').value = "";
+        }
+
+        async function toggleCheck(id, rid, val) { await fetch(DB + `/SW/${id}/checks/${rid}.json`, { method:'PUT', body: JSON.stringify(val) }); }
+        async function setStatus(path, id, s) { await fetch(DB + `/${path}/${id}.json`, { method:'PATCH', body: JSON.stringify({status:s}) }); }
+        async function del(path, id) { if(confirm("Delete?")) await fetch(DB + `/${path}/${id}.json`, { method:'DELETE' }); }
+    </script>
+</body>
+</html>
